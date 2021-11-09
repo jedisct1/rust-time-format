@@ -1,0 +1,11 @@
+[package]
+name = "time-format"
+version = "1.0.0"
+edition = "2018"
+authors = ["Frank Denis <github@pureftpd.org>"]
+description = "Turn a Unix timestamp into date components or into a string."
+keywords = ["time", "format", "strftime", "wasi", "timestamp"]
+license = "MIT"
+homepage = "https://github.com/jedisct1/rust-time-format"
+repository = "https://github.com/jedisct1/rust-time-format"
+readme = "README.md"
