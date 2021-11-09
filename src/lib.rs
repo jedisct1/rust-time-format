@@ -101,6 +101,7 @@ pub struct Components {
     pub year_day: u16,
 }
 
+/// Split a timestamp into its components.
 pub fn components_utc(ts_seconds: u64) -> Result<Components, Error> {
     let mut tm = MaybeUninit::<tm>::uninit();
     if unsafe { gmtime_r(&ts_seconds, tm.as_mut_ptr() as *mut tm) }.is_null() {
