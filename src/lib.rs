@@ -8,7 +8,7 @@
 //!
 //! ```rust
 //! let ts = std::time::SystemTime::now()
-//! .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+//!     .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
 //!
 //! let components = time_format::components_utc(ts).unwrap();
 //! ```
@@ -21,7 +21,7 @@
 //!
 //! ```rust
 //! let ts = std::time::SystemTime::now()
-//! .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+//!     .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
 //!
 //! let s = time_format::strftime_utc("%Y-%m-%d", ts).unwrap();
 //! ```
@@ -29,7 +29,6 @@
 //! ## That's it
 //!
 //! If you need a minimal crate to get timestamps and perform basic operations on them, check out [coarsetime](https://crates.io/crates/coarsetime).
-//!
 
 use std::{
     ffi::CString,
