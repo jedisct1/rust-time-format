@@ -7,8 +7,7 @@
 //! The `components_utc()` function returns the components of a timestamp:
 //!
 //! ```rust
-//! let ts = std::time::SystemTime::now()
-//!     .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+//! let ts = time_format::now().unwrap();
 //!
 //! let components = time_format::components_utc(ts).unwrap();
 //! ```
@@ -20,8 +19,7 @@
 //! The `strftime_utc()` function formats a timestamp, using the same format as the `strftime()` function of the standard C library.
 //!
 //! ```rust
-//! let ts = std::time::SystemTime::now()
-//!     .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+//! let ts = time_format::now().unwrap();
 //!
 //! let s = time_format::strftime_utc("%Y-%m-%d", ts).unwrap();
 //! ```
@@ -31,6 +29,7 @@
 //! If you need a minimal crate to get timestamps and perform basic operations on them, check out [coarsetime](https://crates.io/crates/coarsetime).
 
 use std::{
+    convert::TryInto,
     ffi::CString,
     fmt,
     mem::MaybeUninit,
@@ -38,7 +37,7 @@ use std::{
 };
 
 #[allow(non_camel_case_types)]
-type time_t = u64;
+type time_t = i64;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -101,7 +100,7 @@ pub struct Components {
 }
 
 /// Split a timestamp into its components.
-pub fn components_utc(ts_seconds: u64) -> Result<Components, Error> {
+pub fn components_utc(ts_seconds: i64) -> Result<Components, Error> {
     let mut tm = MaybeUninit::<tm>::uninit();
     if unsafe { gmtime_r(&ts_seconds, tm.as_mut_ptr() as *mut tm) }.is_null() {
         return Err(Error::TimeError);
@@ -119,9 +118,19 @@ pub fn components_utc(ts_seconds: u64) -> Result<Components, Error> {
     })
 }
 
+/// Return the current UNIX timestamp in seconds.
+pub fn now() -> Result<i64, Error> {
+    Ok(std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|_| Error::TimeError)?
+        .as_secs()
+        .try_into()
+        .map_err(|_| Error::TimeError)?)
+}
+
 /// Return the current time in the specified format, in the UTC time zone.
 /// The time is assumed to be the number of seconds since the Epoch.
-pub fn strftime_utc(format: &'static str, ts_seconds: u64) -> Result<String, Error> {
+pub fn strftime_utc(format: &'static str, ts_seconds: i64) -> Result<String, Error> {
     let mut tm = MaybeUninit::<tm>::uninit();
     if unsafe { gmtime_r(&ts_seconds, tm.as_mut_ptr() as *mut tm) }.is_null() {
         return Err(Error::TimeError);

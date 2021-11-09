@@ -7,9 +7,7 @@ This crate does only one thing: format a Unix timestamp.
 The `components_utc()` function returns the components of a timestamp:
 
 ```rust
-let ts = std::time::SystemTime::now()
-    .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-
+let ts = time_format::now().unwrap();
 let components = time_format::components_utc(ts).unwrap();
 ```
 
@@ -20,9 +18,7 @@ Components are `sec`, `min`, `hour`, `month_day`, `month`, `year`, `week_day` an
 The `strftime_utc()` function formats a timestamp, using the same format as the `strftime()` function of the standard C library.
 
 ```rust
-let ts = std::time::SystemTime::now()
-    .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-
+let ts = time_format::now().unwrap();
 let s = time_format::strftime_utc("%Y-%m-%d", ts).unwrap();
 ```
 
