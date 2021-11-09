@@ -39,6 +39,9 @@ use std::{
 #[allow(non_camel_case_types)]
 type time_t = i64;
 
+/// A UNIX timestamp.
+pub type TimeStamp = i64;
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 struct tm {
@@ -100,7 +103,7 @@ pub struct Components {
 }
 
 /// Split a timestamp into its components.
-pub fn components_utc(ts_seconds: i64) -> Result<Components, Error> {
+pub fn components_utc(ts_seconds: TimeStamp) -> Result<Components, Error> {
     let mut tm = MaybeUninit::<tm>::uninit();
     if unsafe { gmtime_r(&ts_seconds, tm.as_mut_ptr() as *mut tm) }.is_null() {
         return Err(Error::TimeError);
@@ -119,7 +122,7 @@ pub fn components_utc(ts_seconds: i64) -> Result<Components, Error> {
 }
 
 /// Return the current UNIX timestamp in seconds.
-pub fn now() -> Result<i64, Error> {
+pub fn now() -> Result<TimeStamp, Error> {
     Ok(std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|_| Error::TimeError)?
@@ -130,7 +133,7 @@ pub fn now() -> Result<i64, Error> {
 
 /// Return the current time in the specified format, in the UTC time zone.
 /// The time is assumed to be the number of seconds since the Epoch.
-pub fn strftime_utc(format: &'static str, ts_seconds: i64) -> Result<String, Error> {
+pub fn strftime_utc(format: &'static str, ts_seconds: TimeStamp) -> Result<String, Error> {
     let mut tm = MaybeUninit::<tm>::uninit();
     if unsafe { gmtime_r(&ts_seconds, tm.as_mut_ptr() as *mut tm) }.is_null() {
         return Err(Error::TimeError);
