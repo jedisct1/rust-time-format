@@ -119,7 +119,7 @@ pub fn components_utc(ts_seconds: u64) -> Result<Components, Error> {
     })
 }
 
-/// Returns the current time in the specified format, in the UTC time zone.
+/// Return the current time in the specified format, in the UTC time zone.
 /// The time is assumed to be the number of seconds since the Epoch.
 pub fn strftime_utc(format: &'static str, ts_seconds: u64) -> Result<String, Error> {
     let mut tm = MaybeUninit::<tm>::uninit();
