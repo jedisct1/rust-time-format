@@ -123,12 +123,12 @@ pub fn components_utc(ts_seconds: TimeStamp) -> Result<Components, Error> {
 
 /// Return the current UNIX timestamp in seconds.
 pub fn now() -> Result<TimeStamp, Error> {
-    Ok(std::time::SystemTime::now()
+    std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|_| Error::TimeError)?
         .as_secs()
         .try_into()
-        .map_err(|_| Error::TimeError)?)
+        .map_err(|_| Error::TimeError)
 }
 
 /// Return the current time in the specified format, in the UTC time zone.
