@@ -12,13 +12,11 @@
 //! let components = time_format::components_utc(ts).unwrap();
 //! ```
 //!
-//! Components are `sec`, `min`, `hour`, `month_day`, `month`, `year`,
-//! `week_day` and `year_day`.
+//! Components are `sec`, `min`, `hour`, `month_day`, `month`, `year`, `week_day` and `year_day`.
 //!
 //! ## Formatting a timestamp
 //!
-//! The `strftime_utc()` function formats a timestamp, using the same format as
-//! the `strftime()` function of the standard C library.
+//! The `strftime_utc()` function formats a timestamp, using the same format as the `strftime()` function of the standard C library.
 //!
 //! ```rust
 //! let ts = time_format::now().unwrap();
@@ -62,12 +60,8 @@ struct tm {
 
 extern "C" {
     fn gmtime_r(ts: *const time_t, tm: *mut tm) -> *mut tm;
-    fn strftime(
-        s: *mut c_char,
-        maxsize: usize,
-        format: *const c_char,
-        timeptr: *const tm,
-    ) -> usize;
+    fn strftime(s: *mut c_char, maxsize: usize, format: *const c_char, timeptr: *const tm)
+        -> usize;
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
