@@ -12,11 +12,13 @@
 //! let components = time_format::components_utc(ts).unwrap();
 //! ```
 //!
-//! Components are `sec`, `min`, `hour`, `month_day`, `month`, `year`, `week_day` and `year_day`.
+//! Components are `sec`, `min`, `hour`, `month_day`, `month`, `year`,
+//! `week_day` and `year_day`.
 //!
 //! ## Formatting a timestamp
 //!
-//! The `strftime_utc()` function formats a timestamp, using the same format as the `strftime()` function of the standard C library.
+//! The `strftime_utc()` function formats a timestamp, using the same format as
+//! the `strftime()` function of the standard C library.
 //!
 //! ```rust
 //! let ts = time_format::now().unwrap();
@@ -60,8 +62,12 @@ struct tm {
 
 extern "C" {
     fn gmtime_r(ts: *const time_t, tm: *mut tm) -> *mut tm;
-    fn strftime(s: *mut c_char, maxsize: usize, format: *const c_char, timeptr: *const tm)
-        -> usize;
+    fn strftime(
+        s: *mut c_char,
+        maxsize: usize,
+        format: *const c_char,
+        timeptr: *const tm,
+    ) -> usize;
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -133,7 +139,7 @@ pub fn now() -> Result<TimeStamp, Error> {
 
 /// Return the current time in the specified format, in the UTC time zone.
 /// The time is assumed to be the number of seconds since the Epoch.
-pub fn strftime_utc(format: &'static str, ts_seconds: TimeStamp) -> Result<String, Error> {
+pub fn strftime_utc(format: &str, ts_seconds: TimeStamp) -> Result<String, Error> {
     let mut tm = MaybeUninit::<tm>::uninit();
     if unsafe { gmtime_r(&ts_seconds, tm.as_mut_ptr() as *mut tm) }.is_null() {
         return Err(Error::TimeError);
