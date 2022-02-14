@@ -133,7 +133,8 @@ pub fn now() -> Result<TimeStamp, Error> {
 
 /// Return the current time in the specified format, in the UTC time zone.
 /// The time is assumed to be the number of seconds since the Epoch.
-pub fn strftime_utc(format: &str, ts_seconds: TimeStamp) -> Result<String, Error> {
+pub fn strftime_utc(format: impl AsRef<str>, ts_seconds: TimeStamp) -> Result<String, Error> {
+    let format = format.as_ref();
     let mut tm = MaybeUninit::<tm>::uninit();
     if unsafe { gmtime_r(&ts_seconds, tm.as_mut_ptr() as *mut tm) }.is_null() {
         return Err(Error::TimeError);
