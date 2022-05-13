@@ -12,11 +12,13 @@
 //! let components = time_format::components_utc(ts).unwrap();
 //! ```
 //!
-//! Components are `sec`, `min`, `hour`, `month_day`, `month`, `year`, `week_day` and `year_day`.
+//! Components are `sec`, `min`, `hour`, `month_day`, `month`, `year`,
+//! `week_day` and `year_day`.
 //!
 //! ## Formatting a timestamp
 //!
-//! The `strftime_utc()` function formats a timestamp, using the same format as the `strftime()` function of the standard C library.
+//! The `strftime_utc()` function formats a timestamp, using the same format as
+//! the `strftime()` function of the standard C library.
 //!
 //! ```rust
 //! let ts = time_format::now().unwrap();
