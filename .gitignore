@@ -1,6 +1,7 @@
-/target
-*~
-Cargo.lock
+.claude
 .vscode
-
-
+.zig-cache
+*~
+/target
+Cargo.lock
+CLAUDE.md

@@ -1,11 +1,27 @@
 [package]
 name = "time-format"
-version = "1.1.2"
+version = "1.2.0"
 edition = "2018"
 authors = ["Frank Denis <github@pureftpd.org>"]
-description = "Turn a Unix timestamp into date components or into a string."
-keywords = ["time", "format", "strftime", "wasi", "timestamp"]
+description = "A lightweight library for formatting Unix timestamps with millisecond precision in UTC and local time"
+keywords = ["time", "format", "strftime", "timestamp", "iso8601"]
+categories = ["date-and-time", "internationalization", "no-std"]
 license = "MIT"
 homepage = "https://github.com/jedisct1/rust-time-format"
 repository = "https://github.com/jedisct1/rust-time-format"
+documentation = "https://docs.rs/time-format"
 readme = "README.md"
+
+[badges]
+maintenance = { status = "actively-maintained" }
+
+[features]
+default = []
+bench = []
+
+[dependencies]
+# No external dependencies!
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
