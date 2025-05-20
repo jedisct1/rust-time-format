@@ -10,7 +10,7 @@ A lightweight, zero-dependency Rust crate for formatting Unix timestamps in both
 
 - 🚀 **Zero dependencies** - No external crates needed
 - 🌐 **Multiple timezones** - Support for both UTC and local time zones
-- ⏱️ **Millisecond precision** - High-resolution timestamp formatting 
+- ⏱️ **Millisecond precision** - High-resolution timestamp formatting
 - 🧩 **Component access** - Split timestamps into their individual components
 - 📅 **Standard formats** - Built-in support for ISO 8601, RFC 3339, RFC 2822, and more
 - 🔄 **Custom formatting** - Flexible formatting using C's `strftime` patterns
@@ -50,6 +50,19 @@ let ts = time_format::now().unwrap();
 
 // Get current time with millisecond precision
 let ts_ms = time_format::now_ms().unwrap();
+```
+
+### Converting from SystemTime
+
+```rust
+use std::time::SystemTime;
+
+// Convert a SystemTime to a TimeStamp (seconds)
+let system_time = SystemTime::now();
+let ts = time_format::from_system_time(system_time).unwrap();
+
+// Convert a SystemTime to a TimeStampMs (with millisecond precision)
+let ts_ms = time_format::from_system_time_ms(system_time).unwrap();
 ```
 
 ### Splitting a Timestamp into Components
@@ -252,16 +265,59 @@ use time_format::{format_iso8601_utc, now};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get current time
     let current_time = now()?;
-    
+
     // Format as ISO 8601 for API request
     let timestamp = format_iso8601_utc(current_time)?;
-    
+
     println!("API Request time: {}", timestamp);
     // Example output: "2025-05-20T14:30:45Z"
-    
+
     // Now you can use this timestamp in your API requests
     // let response = make_api_request(timestamp);
-    
+
+    Ok(())
+}
+```
+
+### Converting from SystemTime in Network Applications
+
+```rust
+use std::time::{SystemTime, Duration};
+use time_format::{from_system_time_ms, format_iso8601_ms_utc, strftime_ms_utc};
+
+// Example of tracking network response times
+fn measure_network_response() -> Result<(), Box<dyn std::error::Error>> {
+    // Record start time
+    let start_time = SystemTime::now();
+
+    // Simulate a network request
+    // In a real application, this would be an actual HTTP request
+    std::thread::sleep(Duration::from_millis(237));
+
+    // Record end time
+    let end_time = SystemTime::now();
+
+    // Convert to TimeStampMs
+    let start_ts = from_system_time_ms(start_time)?;
+    let end_ts = from_system_time_ms(end_time)?;
+
+    // Calculate duration
+    let duration_ms = end_ts.total_milliseconds() - start_ts.total_milliseconds();
+
+    // Log with ISO 8601 timestamps
+    println!("Network request at: {}", format_iso8601_ms_utc(start_ts)?);
+    println!("Response received at: {}", format_iso8601_ms_utc(end_ts)?);
+    println!("Request took: {}ms", duration_ms);
+
+    // Custom formatting for logging
+    let log_line = format!(
+        "[{}] Request completed in {}ms",
+        strftime_ms_utc("%Y-%m-%d %H:%M:%S.{ms}", end_ts)?,
+        duration_ms
+    );
+    println!("{}", log_line);
+    // Example: "[2025-05-20 14:30:45.123] Request completed in 237ms"
+
     Ok(())
 }
 ```
@@ -274,20 +330,20 @@ use time_format::{DateFormat, format_common_ms_local, now_ms};
 fn log_message(level: &str, message: &str) -> Result<(), Box<dyn std::error::Error>> {
     // Get current time with millisecond precision
     let current_time = now_ms()?;
-    
+
     // Format with milliseconds for logging
     let timestamp = format_common_ms_local(current_time, DateFormat::DateTime)?;
-    
+
     println!("[{}] {} - {}", timestamp, level, message);
     // Example output: "[2025-05-20 09:30:45.123] INFO - Application started"
-    
+
     Ok(())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     log_message("INFO", "Application started")?;
     log_message("DEBUG", "Configuration loaded")?;
-    
+
     Ok(())
 }
 ```

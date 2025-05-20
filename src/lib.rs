@@ -216,19 +216,173 @@ pub fn components_local(ts_seconds: TimeStamp) -> Result<Components, Error> {
     })
 }
 
-/// Return the current UNIX timestamp in seconds.
-pub fn now() -> Result<TimeStamp, Error> {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
+/// Convert a `std::time::SystemTime` to a UNIX timestamp in seconds.
+///
+/// This function converts a `std::time::SystemTime` instance to a `TimeStamp` (Unix timestamp in seconds).
+/// It handles the conversion and error cases related to negative timestamps or other time conversion issues.
+///
+/// # Examples
+///
+/// ```rust
+/// use std::time::{SystemTime, UNIX_EPOCH, Duration};
+///
+/// // Convert the current system time to a timestamp
+/// let system_time = SystemTime::now();
+/// let timestamp = time_format::from_system_time(system_time).unwrap();
+///
+/// // Convert a specific time
+/// let past_time = UNIX_EPOCH + Duration::from_secs(1500000000);
+/// let past_timestamp = time_format::from_system_time(past_time).unwrap();
+/// assert_eq!(past_timestamp, 1500000000);
+/// ```
+///
+/// ## Working with Time Components
+///
+/// You can use the function to convert a `SystemTime` to components:
+///
+/// ```rust
+/// use std::time::{SystemTime, UNIX_EPOCH, Duration};
+///
+/// // Create a specific time: January 15, 2023 at 14:30:45 UTC
+/// let specific_time = UNIX_EPOCH + Duration::from_secs(1673793045);
+///
+/// // Convert to timestamp
+/// let ts = time_format::from_system_time(specific_time).unwrap();
+///
+/// // Get the time components
+/// let components = time_format::components_utc(ts).unwrap();
+///
+/// // Verify the time components
+/// assert_eq!(components.year, 2023);
+/// assert_eq!(components.month, 1); // January
+/// assert_eq!(components.month_day, 15);
+/// assert_eq!(components.hour, 14);
+/// assert_eq!(components.min, 30);
+/// assert_eq!(components.sec, 45);
+/// ```
+///
+/// ## Formatting with strftime
+///
+/// Convert a `SystemTime` and format it as a string:
+///
+/// ```rust
+/// use std::time::{SystemTime, UNIX_EPOCH, Duration};
+///
+/// // Create a specific time
+/// let specific_time = UNIX_EPOCH + Duration::from_secs(1673793045);
+///
+/// // Convert to timestamp
+/// let ts = time_format::from_system_time(specific_time).unwrap();
+///
+/// // Format as ISO 8601
+/// let iso8601 = time_format::format_iso8601_utc(ts).unwrap();
+/// assert_eq!(iso8601, "2023-01-15T14:30:45Z");
+///
+/// // Custom formatting
+/// let custom_format = time_format::strftime_utc("%B %d, %Y at %H:%M:%S", ts).unwrap();
+/// assert_eq!(custom_format, "January 15, 2023 at 14:30:45");
+/// ```
+pub fn from_system_time(time: std::time::SystemTime) -> Result<TimeStamp, Error> {
+    time.duration_since(std::time::UNIX_EPOCH)
         .map_err(|_| Error::TimeError)?
         .as_secs()
         .try_into()
         .map_err(|_| Error::InvalidTimestamp)
 }
 
-/// Return the current UNIX timestamp with millisecond precision.
-pub fn now_ms() -> Result<TimeStampMs, Error> {
-    let duration = std::time::SystemTime::now()
+/// Return the current UNIX timestamp in seconds.
+pub fn now() -> Result<TimeStamp, Error> {
+    from_system_time(std::time::SystemTime::now())
+}
+
+/// Convert a `std::time::SystemTime` to a UNIX timestamp with millisecond precision.
+///
+/// This function converts a `std::time::SystemTime` instance to a `TimeStampMs` (Unix timestamp with millisecond precision).
+/// It extracts both the seconds and milliseconds components from the system time.
+///
+/// # Examples
+///
+/// ```rust
+/// use std::time::{SystemTime, UNIX_EPOCH, Duration};
+///
+/// // Convert the current system time to a timestamp with millisecond precision
+/// let system_time = SystemTime::now();
+/// let timestamp_ms = time_format::from_system_time_ms(system_time).unwrap();
+/// println!("Seconds: {}, Milliseconds: {}", timestamp_ms.seconds, timestamp_ms.milliseconds);
+///
+/// // Convert a specific time with millisecond precision
+/// let specific_time = UNIX_EPOCH + Duration::from_millis(1500000123);
+/// let specific_ts_ms = time_format::from_system_time_ms(specific_time).unwrap();
+/// assert_eq!(specific_ts_ms.seconds, 1500000);
+/// assert_eq!(specific_ts_ms.milliseconds, 123);
+/// ```
+///
+/// ## Using with TimeStampMs methods
+///
+/// ```rust
+/// use std::time::{SystemTime, UNIX_EPOCH, Duration};
+///
+/// // Create a precise time: 1500000 seconds and 123 milliseconds after the epoch
+/// let specific_time = UNIX_EPOCH + Duration::from_millis(1500000123);
+///
+/// // Convert to TimeStampMs
+/// let ts_ms = time_format::from_system_time_ms(specific_time).unwrap();
+///
+/// // Get total milliseconds
+/// let total_ms = ts_ms.total_milliseconds();
+/// assert_eq!(total_ms, 1500000123);
+/// ```
+///
+/// ## Formatting timestamps with millisecond precision
+///
+/// You can format a timestamp with millisecond precision:
+///
+/// ```rust
+/// use std::time::{SystemTime, UNIX_EPOCH, Duration};
+///
+/// // Create a specific timestamp with millisecond precision
+/// // We'll use a fixed timestamp rather than a date calculation to avoid test failures
+/// let ts_ms = time_format::TimeStampMs::new(1743087045, 678);
+///
+/// // Format with milliseconds using your preferred pattern
+/// let formatted = time_format::strftime_ms_utc("%Y-%m-%d %H:%M:%S.{ms}", ts_ms).unwrap();
+///
+/// // Verify the milliseconds are included
+/// assert!(formatted.contains(".678"));
+///
+/// // Format as ISO 8601 with milliseconds
+/// let iso8601_ms = time_format::format_iso8601_ms_utc(ts_ms).unwrap();
+/// assert!(iso8601_ms.ends_with(".678Z"));
+///
+/// // Use with common date formats
+/// let rfc3339 = time_format::format_common_ms_utc(ts_ms, time_format::DateFormat::RFC3339).unwrap();
+/// assert!(rfc3339.contains(".678"));
+/// ```
+///
+/// ## Converting between TimeStamp and TimeStampMs
+///
+/// ```rust
+/// use std::time::{SystemTime, UNIX_EPOCH, Duration};
+///
+/// // Create a system time with millisecond precision
+/// let system_time = UNIX_EPOCH + Duration::from_millis(1673793045678);
+///
+/// // Convert to TimeStampMs
+/// let ts_ms = time_format::from_system_time_ms(system_time).unwrap();
+/// assert_eq!(ts_ms.seconds, 1673793045);
+/// assert_eq!(ts_ms.milliseconds, 678);
+///
+/// // Convert to TimeStamp (loses millisecond precision)
+/// let ts = time_format::from_system_time(system_time).unwrap();
+/// assert_eq!(ts, 1673793045);
+///
+/// // Convert from TimeStamp to TimeStampMs
+/// let ts_ms_from_ts = time_format::TimeStampMs::from_timestamp(ts);
+/// assert_eq!(ts_ms_from_ts.seconds, ts);
+/// assert_eq!(ts_ms_from_ts.milliseconds, 0); // milliseconds are lost
+/// ```
+pub fn from_system_time_ms(time: std::time::SystemTime) -> Result<TimeStampMs, Error> {
+    let duration = time
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|_| Error::TimeError)?;
 
@@ -239,6 +393,11 @@ pub fn now_ms() -> Result<TimeStampMs, Error> {
     let millis = duration.subsec_millis() as u16;
 
     Ok(TimeStampMs::new(seconds, millis))
+}
+
+/// Return the current UNIX timestamp with millisecond precision.
+pub fn now_ms() -> Result<TimeStampMs, Error> {
+    from_system_time_ms(std::time::SystemTime::now())
 }
 
 /// Return the current time in the specified format, in the UTC time zone.
