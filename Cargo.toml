@@ -1,6 +1,6 @@
 [package]
 name = "time-format"
-version = "1.2.0"
+version = "1.2.1"
 edition = "2018"
 authors = ["Frank Denis <github@pureftpd.org>"]
 description = "A lightweight library for formatting Unix timestamps with millisecond precision in UTC and local time"
