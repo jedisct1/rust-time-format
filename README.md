@@ -37,7 +37,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-time-format = "1.2.0"
+time-format = "1.2.1"
 ```
 
 ## Basic Usage
