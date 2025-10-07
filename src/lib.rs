@@ -47,6 +47,8 @@ impl TimeStampMs {
     }
 }
 
+// Unix/Linux/macOS tm struct with timezone fields
+#[cfg(not(target_env = "msvc"))]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 struct tm {
@@ -63,11 +65,60 @@ struct tm {
     pub tm_zone: *mut c_char,
 }
 
+// Windows MSVC tm struct without timezone fields
+#[cfg(target_env = "msvc")]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+struct tm {
+    pub tm_sec: c_int,
+    pub tm_min: c_int,
+    pub tm_hour: c_int,
+    pub tm_mday: c_int,
+    pub tm_mon: c_int,
+    pub tm_year: c_int,
+    pub tm_wday: c_int,
+    pub tm_yday: c_int,
+    pub tm_isdst: c_int,
+}
+
+// Unix/Linux/macOS - use _r variants
+#[cfg(not(target_env = "msvc"))]
 extern "C" {
     fn gmtime_r(ts: *const time_t, tm: *mut tm) -> *mut tm;
     fn localtime_r(ts: *const time_t, tm: *mut tm) -> *mut tm;
     fn strftime(s: *mut c_char, maxsize: usize, format: *const c_char, timeptr: *const tm)
         -> usize;
+}
+
+// Windows MSVC - use _s variants (note: reversed parameter order)
+#[cfg(target_env = "msvc")]
+extern "C" {
+    fn gmtime_s(tm: *mut tm, ts: *const time_t) -> c_int;
+    fn localtime_s(tm: *mut tm, ts: *const time_t) -> c_int;
+    fn strftime(s: *mut c_char, maxsize: usize, format: *const c_char, timeptr: *const tm)
+        -> usize;
+}
+
+// Platform-specific wrappers for gmtime
+#[cfg(not(target_env = "msvc"))]
+unsafe fn safe_gmtime(ts: *const time_t, tm: *mut tm) -> bool {
+    !gmtime_r(ts, tm).is_null()
+}
+
+#[cfg(target_env = "msvc")]
+unsafe fn safe_gmtime(ts: *const time_t, tm: *mut tm) -> bool {
+    gmtime_s(tm, ts) == 0
+}
+
+// Platform-specific wrappers for localtime
+#[cfg(not(target_env = "msvc"))]
+unsafe fn safe_localtime(ts: *const time_t, tm: *mut tm) -> bool {
+    !localtime_r(ts, tm).is_null()
+}
+
+#[cfg(target_env = "msvc")]
+unsafe fn safe_localtime(ts: *const time_t, tm: *mut tm) -> bool {
+    localtime_s(tm, ts) == 0
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -181,7 +232,7 @@ pub struct Components {
 /// Split a timestamp into its components in UTC timezone.
 pub fn components_utc(ts_seconds: TimeStamp) -> Result<Components, Error> {
     let mut tm = MaybeUninit::<tm>::uninit();
-    if unsafe { gmtime_r(&ts_seconds, tm.as_mut_ptr()) }.is_null() {
+    if !unsafe { safe_gmtime(&ts_seconds, tm.as_mut_ptr()) } {
         return Err(Error::TimeError);
     }
     let tm = unsafe { tm.assume_init() };
@@ -200,7 +251,7 @@ pub fn components_utc(ts_seconds: TimeStamp) -> Result<Components, Error> {
 /// Split a timestamp into its components in the local timezone.
 pub fn components_local(ts_seconds: TimeStamp) -> Result<Components, Error> {
     let mut tm = MaybeUninit::<tm>::uninit();
-    if unsafe { localtime_r(&ts_seconds, tm.as_mut_ptr()) }.is_null() {
+    if !unsafe { safe_localtime(&ts_seconds, tm.as_mut_ptr()) } {
         return Err(Error::TimeError);
     }
     let tm = unsafe { tm.assume_init() };
@@ -411,7 +462,7 @@ pub fn strftime_utc(format: impl AsRef<str>, ts_seconds: TimeStamp) -> Result<St
     validate_format(format)?;
 
     let mut tm = MaybeUninit::<tm>::uninit();
-    if unsafe { gmtime_r(&ts_seconds, tm.as_mut_ptr()) }.is_null() {
+    if !unsafe { safe_gmtime(&ts_seconds, tm.as_mut_ptr()) } {
         return Err(Error::TimeError);
     }
     let tm = unsafe { tm.assume_init() };
@@ -430,7 +481,7 @@ pub fn strftime_local(format: impl AsRef<str>, ts_seconds: TimeStamp) -> Result<
     validate_format(format)?;
 
     let mut tm = MaybeUninit::<tm>::uninit();
-    if unsafe { localtime_r(&ts_seconds, tm.as_mut_ptr()) }.is_null() {
+    if !unsafe { safe_localtime(&ts_seconds, tm.as_mut_ptr()) } {
         return Err(Error::TimeError);
     }
     let tm = unsafe { tm.assume_init() };
@@ -513,7 +564,7 @@ pub fn strftime_ms_utc(format: impl AsRef<str>, ts_ms: TimeStampMs) -> Result<St
     // First, format the seconds part
     // Skip validation in strftime_utc since we already did it
     let mut tm = MaybeUninit::<tm>::uninit();
-    if unsafe { gmtime_r(&ts_ms.seconds, tm.as_mut_ptr()) }.is_null() {
+    if !unsafe { safe_gmtime(&ts_ms.seconds, tm.as_mut_ptr()) } {
         return Err(Error::TimeError);
     }
     let tm = unsafe { tm.assume_init() };
@@ -548,7 +599,7 @@ pub fn strftime_ms_local(format: impl AsRef<str>, ts_ms: TimeStampMs) -> Result<
     // First, format the seconds part
     // Skip validation in strftime_local since we already did it
     let mut tm = MaybeUninit::<tm>::uninit();
-    if unsafe { localtime_r(&ts_ms.seconds, tm.as_mut_ptr()) }.is_null() {
+    if !unsafe { safe_localtime(&ts_ms.seconds, tm.as_mut_ptr()) } {
         return Err(Error::TimeError);
     }
     let tm = unsafe { tm.assume_init() };
