@@ -5,8 +5,11 @@ use std::{
     ffi::CString,
     fmt,
     mem::MaybeUninit,
-    os::raw::{c_char, c_int, c_long},
+    os::raw::{c_char, c_int},
 };
+
+#[cfg(not(target_env = "msvc"))]
+use std::os::raw::c_long;
 
 #[allow(non_camel_case_types)]
 type time_t = i64;
@@ -90,11 +93,11 @@ extern "C" {
         -> usize;
 }
 
-// Windows MSVC - use _s variants (note: reversed parameter order)
+// Windows MSVC - use _s variants with explicit 64-bit time (note: reversed parameter order)
 #[cfg(target_env = "msvc")]
 extern "C" {
-    fn gmtime_s(tm: *mut tm, ts: *const time_t) -> c_int;
-    fn localtime_s(tm: *mut tm, ts: *const time_t) -> c_int;
+    fn _gmtime64_s(tm: *mut tm, ts: *const time_t) -> c_int;
+    fn _localtime64_s(tm: *mut tm, ts: *const time_t) -> c_int;
     fn strftime(s: *mut c_char, maxsize: usize, format: *const c_char, timeptr: *const tm)
         -> usize;
 }
@@ -107,7 +110,7 @@ unsafe fn safe_gmtime(ts: *const time_t, tm: *mut tm) -> bool {
 
 #[cfg(target_env = "msvc")]
 unsafe fn safe_gmtime(ts: *const time_t, tm: *mut tm) -> bool {
-    gmtime_s(tm, ts) == 0
+    _gmtime64_s(tm, ts) == 0
 }
 
 // Platform-specific wrappers for localtime
@@ -118,7 +121,7 @@ unsafe fn safe_localtime(ts: *const time_t, tm: *mut tm) -> bool {
 
 #[cfg(target_env = "msvc")]
 unsafe fn safe_localtime(ts: *const time_t, tm: *mut tm) -> bool {
-    localtime_s(tm, ts) == 0
+    _localtime64_s(tm, ts) == 0
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -882,5 +885,145 @@ pub fn format_common_ms_local(ts_ms: TimeStampMs, format: DateFormat) -> Result<
             format_common_ms_utc(ts_ms, format)
         }
         _ => strftime_ms_local(format_str, ts_ms),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_components_utc() {
+        // Test a known timestamp: 2023-01-15 14:30:45 UTC
+        let ts = 1673793045;
+        let components = components_utc(ts).unwrap();
+
+        assert_eq!(components.year, 2023);
+        assert_eq!(components.month, 1);
+        assert_eq!(components.month_day, 15);
+        assert_eq!(components.hour, 14);
+        assert_eq!(components.min, 30);
+        assert_eq!(components.sec, 45);
+    }
+
+    #[test]
+    fn test_strftime_utc() {
+        // Test a known timestamp: 2023-01-15 14:30:45 UTC
+        let ts = 1673793045;
+        let formatted = strftime_utc("%Y-%m-%d %H:%M:%S", ts).unwrap();
+        assert_eq!(formatted, "2023-01-15 14:30:45");
+    }
+
+    #[test]
+    fn test_iso8601_utc() {
+        let ts = 1673793045;
+        let formatted = format_iso8601_utc(ts).unwrap();
+        assert_eq!(formatted, "2023-01-15T14:30:45Z");
+    }
+
+    #[test]
+    fn test_timestamp_ms() {
+        let ts_ms = TimeStampMs::new(1673793045, 678);
+        assert_eq!(ts_ms.seconds, 1673793045);
+        assert_eq!(ts_ms.milliseconds, 678);
+        assert_eq!(ts_ms.total_milliseconds(), 1673793045678);
+    }
+
+    #[test]
+    fn test_strftime_ms_utc() {
+        let ts_ms = TimeStampMs::new(1673793045, 678);
+        let formatted = strftime_ms_utc("%Y-%m-%d %H:%M:%S.{ms}", ts_ms).unwrap();
+        assert_eq!(formatted, "2023-01-15 14:30:45.678");
+    }
+
+    #[test]
+    fn test_iso8601_ms_utc() {
+        let ts_ms = TimeStampMs::new(1673793045, 678);
+        let formatted = format_iso8601_ms_utc(ts_ms).unwrap();
+        assert_eq!(formatted, "2023-01-15T14:30:45.678Z");
+    }
+
+    #[test]
+    fn test_validate_format() {
+        assert!(validate_format("%Y-%m-%d").is_ok());
+        assert!(validate_format("%Y-%m-%d %H:%M:%S").is_ok());
+        assert!(validate_format("").is_err());
+        assert!(validate_format("%").is_err());
+        assert!(validate_format("%Q").is_err()); // Invalid specifier
+        assert!(validate_format("test\0test").is_err()); // Null byte
+    }
+
+    #[test]
+    fn test_common_formats() {
+        let ts = 1673793045;
+
+        // Test various common formats
+        let sql = format_common_utc(ts, DateFormat::SQL).unwrap();
+        assert_eq!(sql, "2023-01-15 14:30:45");
+
+        let datetime = format_common_utc(ts, DateFormat::DateTime).unwrap();
+        assert_eq!(datetime, "2023-01-15 14:30:45");
+
+        let short_time = format_common_utc(ts, DateFormat::ShortTime).unwrap();
+        assert_eq!(short_time, "14:30");
+
+        let long_time = format_common_utc(ts, DateFormat::LongTime).unwrap();
+        assert_eq!(long_time, "14:30:45");
+    }
+
+    #[test]
+    fn test_from_system_time() {
+        use std::time::{Duration, UNIX_EPOCH};
+
+        let system_time = UNIX_EPOCH + Duration::from_secs(1673793045);
+        let ts = from_system_time(system_time).unwrap();
+        assert_eq!(ts, 1673793045);
+
+        let components = components_utc(ts).unwrap();
+        assert_eq!(components.year, 2023);
+        assert_eq!(components.month, 1);
+        assert_eq!(components.month_day, 15);
+    }
+
+    #[test]
+    fn test_from_system_time_ms() {
+        use std::time::{Duration, UNIX_EPOCH};
+
+        let system_time = UNIX_EPOCH + Duration::from_millis(1673793045678);
+        let ts_ms = from_system_time_ms(system_time).unwrap();
+        assert_eq!(ts_ms.seconds, 1673793045);
+        assert_eq!(ts_ms.milliseconds, 678);
+    }
+
+    #[test]
+    fn test_epoch() {
+        // Test Unix epoch (January 1, 1970, 00:00:00 UTC)
+        let components = components_utc(0).unwrap();
+        assert_eq!(components.year, 1970);
+        assert_eq!(components.month, 1);
+        assert_eq!(components.month_day, 1);
+        assert_eq!(components.hour, 0);
+        assert_eq!(components.min, 0);
+        assert_eq!(components.sec, 0);
+    }
+
+    #[test]
+    fn test_y2k() {
+        // Test Y2K (January 1, 2000, 00:00:00 UTC)
+        let ts = 946684800;
+        let components = components_utc(ts).unwrap();
+        assert_eq!(components.year, 2000);
+        assert_eq!(components.month, 1);
+        assert_eq!(components.month_day, 1);
+    }
+
+    #[test]
+    fn test_leap_year() {
+        // Test February 29, 2020 (leap year)
+        let ts = 1582934400;
+        let components = components_utc(ts).unwrap();
+        assert_eq!(components.year, 2020);
+        assert_eq!(components.month, 2);
+        assert_eq!(components.month_day, 29);
     }
 }
