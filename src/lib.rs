@@ -172,7 +172,7 @@ pub fn validate_format(format: impl AsRef<str>) -> Result<(), Error> {
         return Err(Error::NullByteError);
     }
 
-    let mut chars = format.chars().peekable();
+    let mut chars = format.chars();
     while let Some(c) = chars.next() {
         // Look for % sequences
         if c == '%' {
@@ -185,10 +185,7 @@ pub fn validate_format(format: impl AsRef<str>) -> Result<(), Error> {
                 | Some('R') | Some('s') | Some('S') | Some('t') | Some('T') | Some('u')
                 | Some('U') | Some('V') | Some('w') | Some('W') | Some('x') | Some('X')
                 | Some('y') | Some('Y') | Some('z') | Some('Z') | Some('%') | Some('E')
-                | Some('O') | Some('+') => {
-                    // Valid format specifier
-                    continue;
-                }
+                | Some('O') | Some('+') => {}
                 Some(_c) => {
                     // Unknown format specifier
                     return Err(Error::InvalidFormatString);
@@ -202,8 +199,8 @@ pub fn validate_format(format: impl AsRef<str>) -> Result<(), Error> {
     }
 
     // Check for the special {ms} sequence format
-    let ms_braces = format.match_indices('{').count();
-    let ms_closing_braces = format.match_indices('}').count();
+    let ms_braces = format.matches('{').count();
+    let ms_closing_braces = format.matches('}').count();
     if ms_braces != ms_closing_braces {
         return Err(Error::InvalidFormatString);
     }
@@ -535,19 +532,7 @@ fn format_time_with_tm(format: &str, tm: &tm) -> Result<String, Error> {
 /// This function will validate the format string before attempting to format the time.
 pub fn strftime_ms_utc(format: impl AsRef<str>, ts_ms: TimeStampMs) -> Result<String, Error> {
     let format_str = format.as_ref();
-
-    // Validate the format string (validation also checks for balanced braces)
-    validate_format(format_str)?;
-
-    // First, format the seconds part
-    // Skip validation in strftime_utc since we already did it
-    let mut tm = MaybeUninit::<tm>::uninit();
-    if !unsafe { safe_gmtime(&ts_ms.seconds, tm.as_mut_ptr()) } {
-        return Err(Error::TimeError);
-    }
-    let tm = unsafe { tm.assume_init() };
-
-    let seconds_formatted = format_time_with_tm(format_str, &tm)?;
+    let seconds_formatted = strftime_utc(format_str, ts_ms.seconds)?;
 
     // If the format contains the {ms} placeholder, replace it with the milliseconds
     if format_str.contains("{ms}") {
@@ -570,19 +555,7 @@ pub fn strftime_ms_utc(format: impl AsRef<str>, ts_ms: TimeStampMs) -> Result<St
 /// This function will validate the format string before attempting to format the time.
 pub fn strftime_ms_local(format: impl AsRef<str>, ts_ms: TimeStampMs) -> Result<String, Error> {
     let format_str = format.as_ref();
-
-    // Validate the format string (validation also checks for balanced braces)
-    validate_format(format_str)?;
-
-    // First, format the seconds part
-    // Skip validation in strftime_local since we already did it
-    let mut tm = MaybeUninit::<tm>::uninit();
-    if !unsafe { safe_localtime(&ts_ms.seconds, tm.as_mut_ptr()) } {
-        return Err(Error::TimeError);
-    }
-    let tm = unsafe { tm.assume_init() };
-
-    let seconds_formatted = format_time_with_tm(format_str, &tm)?;
+    let seconds_formatted = strftime_local(format_str, ts_ms.seconds)?;
 
     // If the format contains the {ms} placeholder, replace it with the milliseconds
     if format_str.contains("{ms}") {
@@ -630,7 +603,7 @@ pub fn format_iso8601_local(ts: TimeStamp) -> Result<String, Error> {
     strftime_local("%Y-%m-%dT%H:%M:%S%z", ts).map(|s| {
         // Standard ISO 8601 requires a colon in timezone offset (e.g., -05:00 not -0500)
         // But strftime just gives us -0500, so we need to insert the colon
-        if s.len() > 5 && (s.ends_with('0') || s.chars().last().unwrap().is_ascii_digit()) {
+        if s.len() > 5 && s.chars().last().unwrap().is_ascii_digit() {
             let len = s.len();
             format!("{}:{}", &s[..len - 2], &s[len - 2..])
         } else {
@@ -651,7 +624,7 @@ pub fn format_iso8601_ms_local(ts_ms: TimeStampMs) -> Result<String, Error> {
     strftime_ms_local("%Y-%m-%dT%H:%M:%S.{ms}%z", ts_ms).map(|s| {
         // Insert colon in timezone offset for ISO 8601 compliance
         let len = s.len();
-        if len > 5 && (s.ends_with('0') || s.chars().last().unwrap().is_ascii_digit()) {
+        if len > 5 && s.chars().last().unwrap().is_ascii_digit() {
             format!("{}:{}", &s[..len - 2], &s[len - 2..])
         } else {
             s
@@ -732,7 +705,7 @@ pub fn format_common_utc(ts: TimeStamp, format: DateFormat) -> Result<String, Er
         DateFormat::RFC3339 => {
             // Handle RFC3339 specially to ensure proper timezone formatting
             strftime_utc(format_str, ts).map(|s| {
-                if s.ends_with('0') || s.chars().last().unwrap().is_ascii_digit() {
+                if s.chars().last().unwrap().is_ascii_digit() {
                     let len = s.len();
                     format!("{}:{}", &s[..len - 2], &s[len - 2..])
                 } else {
@@ -760,17 +733,7 @@ pub fn format_common_local(ts: TimeStamp, format: DateFormat) -> Result<String, 
     let format_str = format.get_format_string();
 
     match format {
-        DateFormat::RFC3339 => {
-            // Handle RFC3339 specially to ensure proper timezone formatting
-            strftime_local(format_str, ts).map(|s| {
-                if s.ends_with('0') || s.chars().last().unwrap().is_ascii_digit() {
-                    let len = s.len();
-                    format!("{}:{}", &s[..len - 2], &s[len - 2..])
-                } else {
-                    s
-                }
-            })
-        }
+        DateFormat::RFC3339 => format_iso8601_local(ts),
         DateFormat::HTTP => {
             // HTTP dates are always in GMT/UTC, so redirect to the UTC version
             format_common_utc(ts, format)
@@ -807,7 +770,7 @@ pub fn format_common_ms_utc(ts_ms: TimeStampMs, format: DateFormat) -> Result<St
         DateFormat::RFC3339 => {
             // Handle RFC3339 specially for timezone formatting
             strftime_ms_utc(format_str, ts_ms).map(|s| {
-                if s.ends_with('0') || s.chars().last().unwrap().is_ascii_digit() {
+                if s.chars().last().unwrap().is_ascii_digit() {
                     let len = s.len();
                     format!("{}:{}", &s[..len - 2], &s[len - 2..])
                 } else {
@@ -835,7 +798,6 @@ pub fn format_common_ms_utc(ts_ms: TimeStampMs, format: DateFormat) -> Result<St
 pub fn format_common_ms_local(ts_ms: TimeStampMs, format: DateFormat) -> Result<String, Error> {
     // For formats that can reasonably include milliseconds, add them
     let format_str = match format {
-        DateFormat::RFC3339 => "%Y-%m-%dT%H:%M:%S.{ms}%z",
         DateFormat::SQL => "%Y-%m-%d %H:%M:%S.{ms}",
         DateFormat::DateTime => "%Y-%m-%d %H:%M:%S.{ms}",
         DateFormat::LongTime => "%H:%M:%S.{ms}",
@@ -844,17 +806,7 @@ pub fn format_common_ms_local(ts_ms: TimeStampMs, format: DateFormat) -> Result<
     };
 
     match format {
-        DateFormat::RFC3339 => {
-            // Handle RFC3339 specially for timezone formatting
-            strftime_ms_local(format_str, ts_ms).map(|s| {
-                if s.ends_with('0') || s.chars().last().unwrap().is_ascii_digit() {
-                    let len = s.len();
-                    format!("{}:{}", &s[..len - 2], &s[len - 2..])
-                } else {
-                    s
-                }
-            })
-        }
+        DateFormat::RFC3339 => format_iso8601_ms_local(ts_ms),
         DateFormat::HTTP => {
             // HTTP dates are always in GMT/UTC, so redirect to the UTC version
             format_common_ms_utc(ts_ms, format)
