@@ -494,29 +494,14 @@ pub fn strftime_local(format: impl AsRef<str>, ts_seconds: TimeStamp) -> Result<
 
 // Internal helper function to format time with a tm struct
 fn format_time_with_tm(format: &str, tm: &tm) -> Result<String, Error> {
-    let format_len = format.len();
     let format = CString::new(format).map_err(|_| Error::NullByteError)?;
-    let mut buf_size = format_len;
+
+    const MAX_BUF_SIZE: usize = 1024 * 1024;
+    let mut buf_size = format.as_bytes().len().max(128);
     let mut buf: Vec<u8> = vec![0; buf_size];
 
-    // Initial attempt
-    let mut len = unsafe {
-        strftime(
-            buf.as_mut_ptr() as *mut c_char,
-            buf_size,
-            format.as_ptr() as *const c_char,
-            tm,
-        )
-    };
-
-    // If the format is invalid, strftime returns 0 but won't use more buffer space
-    // We try once with a much larger buffer to distinguish between these cases
-    if len == 0 {
-        // Try with a larger buffer first
-        buf_size *= 10;
-        buf.resize(buf_size, 0);
-
-        len = unsafe {
+    loop {
+        let len = unsafe {
             strftime(
                 buf.as_mut_ptr() as *mut c_char,
                 buf_size,
@@ -525,28 +510,18 @@ fn format_time_with_tm(format: &str, tm: &tm) -> Result<String, Error> {
             )
         };
 
-        // If still 0 with a much larger buffer, it's likely an invalid format
-        if len == 0 {
+        if len > 0 {
+            buf.truncate(len);
+            return Ok(String::from_utf8_lossy(&buf).into_owned());
+        }
+
+        if buf_size >= MAX_BUF_SIZE {
             return Err(Error::InvalidFormatString);
         }
-    }
 
-    // Keep growing the buffer if needed
-    while len == 0 {
         buf_size *= 2;
         buf.resize(buf_size, 0);
-        len = unsafe {
-            strftime(
-                buf.as_mut_ptr() as *mut c_char,
-                buf_size,
-                format.as_ptr() as *const c_char,
-                tm,
-            )
-        };
     }
-
-    buf.truncate(len);
-    String::from_utf8(buf).map_err(|_| Error::Utf8Error)
 }
 
 /// Return the current time in the specified format, in the UTC time zone,
@@ -912,6 +887,23 @@ mod tests {
         let ts = 1673793045;
         let formatted = strftime_utc("%Y-%m-%d %H:%M:%S", ts).unwrap();
         assert_eq!(formatted, "2023-01-15 14:30:45");
+    }
+
+    #[test]
+    fn test_strftime_locale_specifiers() {
+        let ts = 1673793045;
+
+        let c_format = strftime_utc("%c", ts).unwrap();
+        assert!(!c_format.is_empty());
+
+        let z_format = strftime_utc("%Z", ts).unwrap();
+        assert!(!z_format.is_empty());
+
+        let c_local = strftime_local("%c", ts).unwrap();
+        assert!(!c_local.is_empty());
+
+        let z_local = strftime_local("%Z", ts).unwrap();
+        assert!(!z_local.is_empty());
     }
 
     #[test]
