@@ -1,6 +1,6 @@
 [package]
 name = "time-format"
-version = "1.2.2"
+version = "1.2.4"
 edition = "2018"
 authors = ["Frank Denis <github@pureftpd.org>"]
 description = "Unix timestamp and date formatting with strftime, ISO 8601, and RFC 3339 support in UTC and local time"
